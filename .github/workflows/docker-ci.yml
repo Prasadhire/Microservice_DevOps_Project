@@ -1,0 +1,333 @@
+name: GitOps CI/CD Pipeline to Docker Hub & ArgoCD
+
+on:
+  push:
+    branches:
+      - main
+      - gitops
+    paths:
+      - 'src/**'
+  pull_request:
+    branches:
+      - main
+      - gitops
+    paths:
+      - 'src/**'
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions UI
+
+jobs:
+  # =========================================================================
+  # JOB 1: CHANGE DETECTION
+  # =========================================================================
+  # This job detects which microservice folder has changed.
+  # Subsequent jobs run only if their corresponding service folder has changes.
+  # =========================================================================
+  detect-changes:
+    name: 🔍 Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      ui: ${{ steps.filter.outputs.ui }}
+      catalog: ${{ steps.filter.outputs.catalog }}
+      cart: ${{ steps.filter.outputs.cart }}
+      checkout: ${{ steps.filter.outputs.checkout }}
+      orders: ${{ steps.filter.outputs.orders }}
+      sha_short: ${{ steps.vars.outputs.sha_short }}
+    steps:
+      - name: 📂 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Detect Changes in Microservices
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ui:
+              - 'src/ui/**'
+            catalog:
+              - 'src/catalog/**'
+            cart:
+              - 'src/cart/**'
+            checkout:
+              - 'src/checkout/**'
+            orders:
+              - 'src/orders/**'
+
+      - name: 🏷️ Get short Git Commit SHA
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+  # =========================================================================
+  # JOB 2: UI SERVICE PIPELINE
+  # =========================================================================
+  build-ui:
+    name: ☕ Build & Push UI Service
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.ui == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📂 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK 21 (Corretto)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: '21'
+          cache: 'maven'
+          cache-dependency-path: src/ui/pom.xml
+
+      - name: 🧪 Run Maven Tests
+        run: |
+          cd src/ui
+          chmod +x mvnw
+          ./mvnw test
+
+      - name: 🔑 Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 🏷️ Extract Docker Metadata (tags/labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/retail-store-ui
+          tags: |
+            type=sha,format=short
+            type=ref,event=branch
+            latest
+
+      - name: 🚀 Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./src/ui
+          file: ./src/ui/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # =========================================================================
+  # JOB 3: CATALOG SERVICE PIPELINE
+  # =========================================================================
+  build-catalog:
+    name: 🐹 Build & Push Catalog Service
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.catalog == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📂 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: src/catalog/go.sum
+
+      - name: 🧪 Run Go Tests
+        run: |
+          cd src/catalog
+          go test ./...
+
+      - name: 🔑 Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 🏷️ Extract Docker Metadata (tags/labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/retail-store-catalog
+          tags: |
+            type=sha,format=short
+            type=ref,event=branch
+            latest
+
+      - name: 🚀 Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./src/catalog
+          file: ./src/catalog/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # =========================================================================
+  # JOB 4: CART SERVICE PIPELINE
+  # =========================================================================
+  build-cart:
+    name: ☕ Build & Push Cart Service
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.cart == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📂 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK 21 (Corretto)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: '21'
+          cache: 'maven'
+          cache-dependency-path: src/cart/pom.xml
+
+      - name: 🧪 Run Maven Tests
+        run: |
+          cd src/cart
+          chmod +x mvnw
+          ./mvnw test
+
+      - name: 🔑 Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 🏷️ Extract Docker Metadata (tags/labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/retail-store-cart
+          tags: |
+            type=sha,format=short
+            type=ref,event=branch
+            latest
+
+      - name: 🚀 Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./src/cart
+          file: ./src/cart/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # =========================================================================
+  # JOB 5: CHECKOUT SERVICE PIPELINE
+  # =========================================================================
+  build-checkout:
+    name: 🟢 Build & Push Checkout Service
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.checkout == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📂 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: src/checkout/yarn.lock
+
+      - name: 🧪 Install dependencies & Run Tests
+        run: |
+          cd src/checkout
+          yarn install --frozen-lockfile
+          yarn test
+
+      - name: 🔑 Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 🏷️ Extract Docker Metadata (tags/labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/retail-store-checkout
+          tags: |
+            type=sha,format=short
+            type=ref,event=branch
+            latest
+
+      - name: 🚀 Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./src/checkout
+          file: ./src/checkout/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # =========================================================================
+  # JOB 6: ORDERS SERVICE PIPELINE
+  # =========================================================================
+  build-orders:
+    name: ☕ Build & Push Orders Service
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.orders == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📂 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK 21 (Corretto)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: '21'
+          cache: 'maven'
+          cache-dependency-path: src/orders/pom.xml
+
+      - name: 🧪 Run Maven Tests
+        run: |
+          cd src/orders
+          chmod +x mvnw
+          ./mvnw test
+
+      - name: 🔑 Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 🏷️ Extract Docker Metadata (tags/labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/retail-store-orders
+          tags: |
+            type=sha,format=short
+            type=ref,event=branch
+            latest
+
+      - name: 🚀 Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./src/orders
+          file: ./src/orders/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # =========================================================================
+  # JOB 7: CALL REUSABLE CD WORKFLOW
+  # =========================================================================
+  trigger-cd:
+    name: 🔄 Trigger CD Workflow
+    needs:
+      - detect-changes
+      - build-ui
+      - build-catalog
+      - build-cart
+      - build-checkout
+      - build-orders
+    # Run only if none of the jobs failed or were cancelled
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    uses: ./.github/workflows/gitops-cd.yml
+    with:
+      ui: ${{ needs.detect-changes.outputs.ui }}
+      catalog: ${{ needs.detect-changes.outputs.catalog }}
+      cart: ${{ needs.detect-changes.outputs.cart }}
+      checkout: ${{ needs.detect-changes.outputs.checkout }}
+      orders: ${{ needs.detect-changes.outputs.orders }}
+      sha_short: ${{ needs.detect-changes.outputs.sha_short }}
+      branch: ${{ github.ref_name }}
+    secrets: inherit

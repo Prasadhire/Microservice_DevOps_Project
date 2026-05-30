@@ -1,0 +1,85 @@
+name: Terraform GitOps CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - gitops
+    paths:
+      - 'terraform/**'
+  pull_request:
+    branches:
+      - main
+      - gitops
+    paths:
+      - 'terraform/**'
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions UI
+
+# Default settings for all jobs in this workflow
+defaults:
+  run:
+    working-directory: terraform
+
+jobs:
+  terraform:
+    name: 🌍 Terraform Plan & Apply
+    runs-on: ubuntu-latest
+    
+    steps:
+      # =========================================================================
+      # 1. CHECKOUT & SYSTEM SETUP
+      # =========================================================================
+      - name: 📂 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔑 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: ⚙️ Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.8.0" # Matches >= 1.0 requirement
+
+      # =========================================================================
+      # 2. VALIDATION STAGE
+      # =========================================================================
+      - name: 🔍 Terraform Format Check
+        id: fmt
+        run: terraform fmt -check
+        continue-on-error: true
+
+      - name: 📂 Terraform Init
+        id: init
+        run: terraform init
+
+      - name: 🛠️ Terraform Validate
+        id: validate
+        run: terraform validate
+
+      # =========================================================================
+      # 3. PLANNING STAGE (Runs on PRs and Pushes)
+      # =========================================================================
+      - name: 📋 Terraform Plan
+        id: plan
+        run: terraform plan -no-color
+        continue-on-error: false
+
+      # =========================================================================
+      # 4. DEPLOYMENT STAGE (Only runs on Pushes/Merges to main or gitops)
+      # =========================================================================
+      # Bootstrap EKS in 3 phases to avoid provider/endpoint chicken-and-egg dependency issues:
+      - name: "Terraform Apply (Phase 1: VPC)"
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/gitops')
+        run: terraform apply -target=module.vpc -auto-approve
+
+      - name: "Terraform Apply (Phase 2: EKS Cluster)"
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/gitops')
+        run: terraform apply -target=module.retail_app_eks -auto-approve
+
+      - name: "Terraform Apply (Phase 3: Helm Addons & Apps)"
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/gitops')
+        run: terraform apply -auto-approve

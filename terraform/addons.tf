@@ -17,8 +17,9 @@ module "eks_addons" {
   # =============================================================================
   enable_cert_manager = true
   cert_manager = {
-    most_recent = true
-    namespace   = "cert-manager"
+    most_recent                = true
+    namespace                  = "cert-manager"
+    disable_openapi_validation = true
   }
 
   # =============================================================================
@@ -26,8 +27,9 @@ module "eks_addons" {
   # =============================================================================
   enable_ingress_nginx = true
   ingress_nginx = {
-    most_recent = true
-    namespace   = "ingress-nginx"
+    most_recent                = true
+    namespace                  = "ingress-nginx"
+    disable_openapi_validation = true
     
     # Basic configuration
     set = [
