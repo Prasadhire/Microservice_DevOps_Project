@@ -28,12 +28,12 @@ Here is the exact architectural blueprint of the enterprise microservice system 
 
 ```mermaid
 graph TD
-    subgraph VPC Boundary
-        subgraph Public Subnets
+    subgraph "VPC Boundary"
+        subgraph "Public Subnets"
             LB["AWS Classic Load Balancer"] --> Ingress["Nginx Ingress Controller"]
         end
         
-        subgraph Private Subnets (EKS Cluster Boundary - retail-store-dprw)
+        subgraph "Private Subnets (EKS Cluster Boundary - retail-store-dprw)"
             Ingress -->|"Routes Traffic"| UIService["UI Service (Java Spring Boot)"]
             
             UIService -->|"API Call"| CatalogService["Catalog Service (Go API)"]
