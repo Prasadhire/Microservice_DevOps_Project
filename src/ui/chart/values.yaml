@@ -6,7 +6,7 @@ replicaCount: 1
 image:
   repository: prasadhire/retail-store-ui
   pullPolicy: Always
-  tag: "1.2.2"
+  tag: "6c5a32b"
 imagePullSecrets:
   - name: regcred
 nameOverride: ""
@@ -125,7 +125,6 @@ ingresses:
       - secretName: tls-secret
         hosts:
           - retail-store.trainwithshubham.com
-
 # Cert Manager Configuration
 certManager:
   createClusterIssuer: true

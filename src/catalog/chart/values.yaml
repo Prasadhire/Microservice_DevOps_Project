@@ -6,7 +6,7 @@ replicaCount: 1
 image:
   repository: prasadhire/retail-store-catalog
   pullPolicy: Always
-  tag: "1.2.2"
+  tag: "6c5a32b"
 imagePullSecrets:
   - name: regcred
 nameOverride: ""
