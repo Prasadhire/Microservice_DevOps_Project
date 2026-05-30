@@ -4,7 +4,7 @@
 
 replicaCount: 1
 image:
-  repository: public.ecr.aws/aws-containers/retail-store-sample-catalog
+  repository: prasadhire/retail-store-catalog
   pullPolicy: Always
   tag: "1.2.2"
 imagePullSecrets:
