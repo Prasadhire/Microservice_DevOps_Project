@@ -323,7 +323,13 @@ jobs:
       - build-checkout
       - build-orders
     runs-on: ubuntu-latest
-    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    if: |
+      always() &&
+      (needs.build-ui.result == 'success' || needs.build-ui.result == 'skipped') &&
+      (needs.build-catalog.result == 'success' || needs.build-catalog.result == 'skipped') &&
+      (needs.build-cart.result == 'success' || needs.build-cart.result == 'skipped') &&
+      (needs.build-checkout.result == 'success' || needs.build-checkout.result == 'skipped') &&
+      (needs.build-orders.result == 'success' || needs.build-orders.result == 'skipped')
     steps:
       - name: 📂 Checkout Repository
         uses: actions/checkout@v4
