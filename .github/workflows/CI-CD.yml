@@ -308,10 +308,13 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   # =========================================================================
-  # JOB 7: CALL REUSABLE CD WORKFLOW
+  # JOB 7: GITOPS AUTOMATED ARGO CD SYNC (CD STEP)
   # =========================================================================
-  trigger-cd:
-    name: 🔄 Trigger CD Workflow
+  # This job runs after all build jobs complete (or are skipped).
+  # It updates the Helm values.yaml files and commits/pushes them back.
+  # =========================================================================
+  update-gitops:
+    name: 🔄 Update ArgoCD Helm Values
     needs:
       - detect-changes
       - build-ui
@@ -319,13 +322,69 @@ jobs:
       - build-cart
       - build-checkout
       - build-orders
-    uses: ./.github/workflows/gitops-cd.yml
-    with:
-      ui: ${{ needs.detect-changes.outputs.ui == 'true' || github.event_name == 'workflow_dispatch' }}
-      catalog: ${{ needs.detect-changes.outputs.catalog == 'true' || github.event_name == 'workflow_dispatch' }}
-      cart: ${{ needs.detect-changes.outputs.cart == 'true' || github.event_name == 'workflow_dispatch' }}
-      checkout: ${{ needs.detect-changes.outputs.checkout == 'true' || github.event_name == 'workflow_dispatch' }}
-      orders: ${{ needs.detect-changes.outputs.orders == 'true' || github.event_name == 'workflow_dispatch' }}
-      sha_short: ${{ needs.detect-changes.outputs.sha_short }}
-      branch: ${{ github.ref_name }}
-    secrets: inherit
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📂 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ✏️ Update Helm Chart values.yaml files
+        run: |
+          UPDATED=false
+          
+          # 1. UI Service
+          if [ "${{ needs.detect-changes.outputs.ui }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Updating UI Helm values..."
+            yq -i '.image.repository = "${{ secrets.DOCKERHUB_USERNAME }}/retail-store-ui" | .image.tag = "${{ needs.detect-changes.outputs.sha_short }}"' src/ui/chart/values.yaml
+            UPDATED=true
+          fi
+          
+          # 2. Catalog Service
+          if [ "${{ needs.detect-changes.outputs.catalog }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Updating Catalog Helm values..."
+            yq -i '.image.repository = "${{ secrets.DOCKERHUB_USERNAME }}/retail-store-catalog" | .image.tag = "${{ needs.detect-changes.outputs.sha_short }}"' src/catalog/chart/values.yaml
+            UPDATED=true
+          fi
+          
+          # 3. Cart Service
+          if [ "${{ needs.detect-changes.outputs.cart }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Updating Cart Helm values..."
+            yq -i '.image.repository = "${{ secrets.DOCKERHUB_USERNAME }}/retail-store-cart" | .image.tag = "${{ needs.detect-changes.outputs.sha_short }}"' src/cart/chart/values.yaml
+            UPDATED=true
+          fi
+          
+          # 4. Checkout Service
+          if [ "${{ needs.detect-changes.outputs.checkout }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Updating Checkout Helm values..."
+            yq -i '.image.repository = "${{ secrets.DOCKERHUB_USERNAME }}/retail-store-checkout" | .image.tag = "${{ needs.detect-changes.outputs.sha_short }}"' src/checkout/chart/values.yaml
+            UPDATED=true
+          fi
+          
+          # 5. Orders Service
+          if [ "${{ needs.detect-changes.outputs.orders }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Updating Orders Helm values..."
+            yq -i '.image.repository = "${{ secrets.DOCKERHUB_USERNAME }}/retail-store-orders" | .image.tag = "${{ needs.detect-changes.outputs.sha_short }}"' src/orders/chart/values.yaml
+            UPDATED=true
+          fi
+          
+          echo "UPDATED=$UPDATED" >> $GITHUB_ENV
+
+      - name: 🚀 Commit and Push GitOps changes
+        if: env.UPDATED == 'true'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Add all changed Helm values files
+          git add src/*/chart/values.yaml
+          
+          # Commit and push only if there are actual diffs
+          git diff --quiet && git diff --staged --quiet || {
+            git commit -m "chore(gitops): auto-update service image tags to ${{ needs.detect-changes.outputs.sha_short }} [skip ci]"
+            
+            # Fetch and rebase before pushing to avoid git race conditions
+            git fetch origin ${{ github.ref_name }}
+            git rebase origin/${{ github.ref_name }}
+            git push origin ${{ github.ref_name }}
+          }
