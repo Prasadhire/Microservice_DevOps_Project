@@ -41,6 +41,12 @@ import org.testcontainers.utility.DockerImageName;
 @Tag("integration")
 public class DynamoDBCartServiceIntegrationTest extends AbstractServiceTests {
 
+  static {
+    System.setProperty("aws.accessKeyId", "test");
+    System.setProperty("aws.secretAccessKey", "test");
+    System.setProperty("aws.region", "us-west-2");
+  }
+
   @Container
   static DynamoDBContainer dynamodbContainer = new DynamoDBContainer(
     DockerImageName.parse("amazon/dynamodb-local:1.20.0")
