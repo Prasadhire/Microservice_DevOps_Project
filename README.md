@@ -8,6 +8,8 @@
 
 Welcome to my **End-to-End Enterprise DevOps & GitOps Project**! This project demonstrates a production-ready, fully-automated microservice architecture running on **Amazon EKS (Elastic Kubernetes Service)** with a dynamic CI/CD GitOps workflow using **GitHub Actions**, **Docker Hub**, and **ArgoCD**.
 
+💡 **Looking for the commands cheat-sheet?** Check out my step-by-step **[🏁 EKS & GitOps Master Bootstrapping Guide](./BOOTSTRAPPING_GUIDE.md)**!
+
 ---
 
 ## 👨‍🏫 Special Mentions & Credits
@@ -20,22 +22,47 @@ Thank you, Shubham sir, for your amazing mentorship and guidance! ⭐
 
 ---
 
-## 🏗️ Architecture Blueprint
+## 🏗️ Production System Architecture
 
-Here is the exact automated flow of code and infrastructure in this repository:
+Here is the exact architectural blueprint of the enterprise microservice system deployed on AWS:
 
 ```mermaid
 graph TD
-    A[Developer Commit] --> B{What changed?}
-    B -->|src/ directory| C[CI: docker-ci.yml]
-    B -->|terraform/ directory| D[IaC: terraform-ci-cd.yml]
-    
-    C -->|Builds & Pushes App| E[CD: gitops-cd.yml]
-    E -->|yq updates values.yaml| F[Commit back to repo]
-    F --> G[ArgoCD GitOps Sync]
-    G --> H[Amazon EKS Cluster]
-    
-    D -->|3-Phase Apply| H
+    subgraph VPC Boundary
+        subgraph Public Subnets
+            LB["AWS Classic Load Balancer"] --> Ingress["Nginx Ingress Controller"]
+        end
+        
+        subgraph Private Subnets (EKS Cluster Boundary - retail-store-dprw)
+            Ingress -->|"Routes Traffic"| UIService["UI Service (Java Spring Boot)"]
+            
+            UIService -->|"API Call"| CatalogService["Catalog Service (Go API)"]
+            UIService -->|"API Call"| CartService["Cart Service (Java API)"]
+            UIService -->|"API Call"| OrdersService["Orders Service (Java API)"]
+            UIService -->|"API Call"| CheckoutService["Checkout Service (NestJS)"]
+            
+            %% Databases & Infrastructure
+            CatalogService -->|"Reads Data"| MySQL[("MySQL Database")]
+            CartService -->|"Caches State"| Redis[("Redis Cache")]
+            OrdersService -->|"Stores Orders"| PostgreSQL[("PostgreSQL")]
+            CheckoutService -->|"Publishes Message"| RabbitMQ{{"RabbitMQ"}}
+            
+            %% GitOps Controller
+            ArgoCD["ArgoCD GitOps Controller"] -->|"Syncs manifests to pods"| UIService
+            ArgoCD --> CatalogService
+            ArgoCD --> CartService
+            ArgoCD --> OrdersService
+            ArgoCD --> CheckoutService
+        end
+    end
+
+    %% Developer Pipeline Trigger
+    Dev[("Prasad (Developer)")] -->|"Git Push"| GitHub[("GitHub Repository")]
+    GitHub -->|"Trigger CI"| CI["GitHub Actions CI (docker-ci.yml)"]
+    CI -->|"Build & Push"| DockerHub[("Docker Hub Registry")]
+    CI -->|"Triggers CD"| CD["GitHub Actions CD (gitops-cd.yml)"]
+    CD -->|"Updates tags & commits back"| GitHub
+    GitHub -->|"Webhooks / Polls"| ArgoCD
 ```
 
 ---
