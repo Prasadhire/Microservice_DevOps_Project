@@ -6,7 +6,7 @@ replicaCount: 1
 image:
   repository: prasadhire/retail-store-cart
   pullPolicy: Always
-  tag: "1.2.2"
+  tag: "d80ca98"
 imagePullSecrets:
   - name: regcred
 nameOverride: ""
