@@ -88,5 +88,9 @@ jobs:
           # Commit and push only if there are actual diffs
           git diff --quiet && git diff --staged --quiet || {
             git commit -m "chore(gitops): auto-update service image tags to ${{ inputs.sha_short }} [skip ci]"
+            
+            # Fetch and rebase before pushing to avoid git race conditions
+            git fetch origin ${{ inputs.branch }}
+            git rebase origin/${{ inputs.branch }}
             git push origin ${{ inputs.branch }}
           }
