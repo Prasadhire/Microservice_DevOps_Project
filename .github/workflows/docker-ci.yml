@@ -319,8 +319,6 @@ jobs:
       - build-cart
       - build-checkout
       - build-orders
-    # Run only if none of the jobs failed or were cancelled
-    if: ${{ always() && !failed() && !cancelled() }}
     uses: ./.github/workflows/gitops-cd.yml
     with:
       ui: ${{ needs.detect-changes.outputs.ui }}
