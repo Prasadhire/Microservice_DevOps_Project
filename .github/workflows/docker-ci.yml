@@ -321,11 +321,11 @@ jobs:
       - build-orders
     uses: ./.github/workflows/gitops-cd.yml
     with:
-      ui: ${{ needs.detect-changes.outputs.ui }}
-      catalog: ${{ needs.detect-changes.outputs.catalog }}
-      cart: ${{ needs.detect-changes.outputs.cart }}
-      checkout: ${{ needs.detect-changes.outputs.checkout }}
-      orders: ${{ needs.detect-changes.outputs.orders }}
+      ui: ${{ needs.detect-changes.outputs.ui == 'true' || github.event_name == 'workflow_dispatch' }}
+      catalog: ${{ needs.detect-changes.outputs.catalog == 'true' || github.event_name == 'workflow_dispatch' }}
+      cart: ${{ needs.detect-changes.outputs.cart == 'true' || github.event_name == 'workflow_dispatch' }}
+      checkout: ${{ needs.detect-changes.outputs.checkout == 'true' || github.event_name == 'workflow_dispatch' }}
+      orders: ${{ needs.detect-changes.outputs.orders == 'true' || github.event_name == 'workflow_dispatch' }}
       sha_short: ${{ needs.detect-changes.outputs.sha_short }}
       branch: ${{ github.ref_name }}
     secrets: inherit
