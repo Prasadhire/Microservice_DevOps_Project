@@ -32,6 +32,9 @@ import org.testcontainers.utility.DockerImageName;
   properties = {
     "retail.cart.persistence.provider=dynamodb",
     "retail.cart.persistence.dynamodb.createTable=true",
+    "aws.accessKeyId=test",
+    "aws.secretAccessKey=test",
+    "aws.region=us-west-2"
   }
 )
 @Testcontainers
