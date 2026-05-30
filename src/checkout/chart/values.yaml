@@ -6,7 +6,7 @@ replicaCount: 1
 image:
   repository: prasadhire/retail-store-checkout
   pullPolicy: Always
-  tag: "6c5a32b"
+  tag: "4f897ea"
 imagePullSecrets:
   - name: regcred
 nameOverride: ''
